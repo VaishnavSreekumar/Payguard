@@ -1,0 +1,14 @@
+# Environment Variables & Secrets
+.env
+.env*.local
+*.pem
+*.key
+*.db
+*.sqlite
+
+# PayGuard runtime receipt file
+payguard_receipts.jsonl
+
+# Node modules & Logs
+node_modules/
+*.log
