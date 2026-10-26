@@ -1,0 +1,156 @@
+{
+  "experimentMetadata": {
+    "experimentId": "replay_1793034488271_fjuk",
+    "timestamp": "2026-10-26T17:08:08.260Z",
+    "sandboxBaseUrl": "https://api-m.sandbox.paypal.com",
+    "nodeVersion": "v22.17.1"
+  },
+  "identifiers": {
+    "senderBatchId": "batch_replay_1793034488271",
+    "paypalRequestId": "req_idempotent_1793034488271",
+    "senderItemId": "item_1793034488271",
+    "recipientConfigured": true
+  },
+  "requestPayload": {
+    "sender_batch_header": {
+      "sender_batch_id": "batch_replay_1793034488271",
+      "email_subject": "PayGuard Idempotency & Replay Verification",
+      "email_message": "Automated replay verification payout for PayGuard P0."
+    },
+    "items": [
+      {
+        "recipient_type": "EMAIL",
+        "amount": {
+          "value": "1.00",
+          "currency": "USD"
+        },
+        "note": "PayGuard P0 Idempotency Verification Payout",
+        "sender_item_id": "item_1793034488271",
+        "receiver": "sb-47po6x53549551@personal.example.com"
+      }
+    ]
+  },
+  "attempt1": {
+    "timestamp": "2026-10-26T17:08:09.339Z",
+    "httpStatus": 201,
+    "headers": {
+      "content-type": "application/json",
+      "date": "Mon, 26 Oct 2026 17:08:11 GMT",
+      "http_x_pp_az_locator": "ccg18.slc",
+      "paypal-debug-id": "f658569235c9f"
+    },
+    "responseBody": {
+      "batch_header": {
+        "payout_batch_id": "UEN7JGPA69ZM6",
+        "batch_status": "PENDING",
+        "sender_batch_header": {
+          "sender_batch_id": "batch_replay_1793034488271",
+          "email_subject": "PayGuard Idempotency &amp; Replay Verification",
+          "email_message": "Automated replay verification payout for PayGuard P0."
+        }
+      },
+      "links": [
+        {
+          "href": "https://api.sandbox.paypal.com/v1/payments/payouts/UEN7JGPA69ZM6",
+          "rel": "self",
+          "method": "GET",
+          "encType": "application/json"
+        }
+      ]
+    }
+  },
+  "attempt2": {
+    "timestamp": "2026-10-26T17:08:10.655Z",
+    "httpStatus": 400,
+    "headers": {
+      "content-type": "application/json",
+      "date": "Mon, 26 Oct 2026 17:08:12 GMT",
+      "http_x_pp_az_locator": "ccg18.slc",
+      "paypal-debug-id": "f44054993e321"
+    },
+    "responseBody": {
+      "name": "USER_BUSINESS_ERROR",
+      "message": "User business error.",
+      "debug_id": "f44054993e321",
+      "information_link": "https://developer.paypal.com/docs/api/payments.payouts-batch/#errors",
+      "details": [
+        {
+          "field": "SENDER_BATCH_ID",
+          "location": "body",
+          "issue": "Batch with given sender_batch_id already exists",
+          "link": [
+            {
+              "href": "https://api.sandbox.paypal.com/v1/payments/payouts/UEN7JGPA69ZM6",
+              "rel": "self",
+              "method": "GET",
+              "encType": "application/json"
+            }
+          ]
+        }
+      ],
+      "links": []
+    }
+  },
+  "batchDetailsLookup": {
+    "httpStatus": 200,
+    "headers": {
+      "content-type": "application/json",
+      "date": "Mon, 26 Oct 2026 17:08:15 GMT",
+      "http_x_pp_az_locator": "ccg18.slc",
+      "paypal-debug-id": "f6151766d6409"
+    },
+    "body": {
+      "batch_header": {
+        "payout_batch_id": "UEN7JGPA69ZM6",
+        "batch_status": "PENDING",
+        "time_created": "2026-10-26T17:08:10Z",
+        "sender_batch_header": {
+          "sender_batch_id": "batch_replay_1793034488271",
+          "email_subject": "PayGuard Idempotency &amp; Replay Verification",
+          "email_message": "Automated replay verification payout for PayGuard P0."
+        },
+        "funding_source": "BALANCE",
+        "amount": {
+          "currency": "USD",
+          "value": "1.00"
+        }
+      },
+      "items": [
+        {
+          "payout_item_id": "EF4N3DJDCJ4H2",
+          "transaction_status": "PENDING",
+          "payout_batch_id": "UEN7JGPA69ZM6",
+          "payout_item": {
+            "recipient_type": "EMAIL",
+            "amount": {
+              "currency": "USD",
+              "value": "1.00"
+            },
+            "note": "PayGuard P0 Idempotency Verification Payout",
+            "receiver": "sb-47po6x53549551@personal.example.com",
+            "sender_item_id": "item_1793034488271",
+            "recipient_wallet": "PAYPAL",
+            "purpose": "GOODS"
+          },
+          "links": [
+            {
+              "href": "https://api.sandbox.paypal.com/v1/payments/payouts-item/EF4N3DJDCJ4H2",
+              "rel": "item",
+              "method": "GET",
+              "encType": "application/json"
+            }
+          ]
+        }
+      ],
+      "links": [
+        {
+          "href": "https://api.sandbox.paypal.com/v1/payments/payouts/UEN7JGPA69ZM6?page_size=1000&page=1",
+          "rel": "self",
+          "method": "GET",
+          "encType": "application/json"
+        }
+      ]
+    }
+  },
+  "measuredConclusion": "Attempt 1 returned HTTP 201. Sequential replay Attempt 2 was rejected by PayPal with HTTP 400 (USER_BUSINESS_ERROR)."
+}
