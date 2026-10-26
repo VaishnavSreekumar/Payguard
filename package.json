@@ -1,0 +1,11 @@
+{
+  "name": "payguard",
+  "version": "0.1.0",
+  "description": "PayGuard - Pre-payment authorization & verification prototype",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node tests/test_recipient_config.js && node tests/test_payout_replay.js && node tests/test_merchant_registry.js && node tests/test_gateway_payout_lifecycle.js && node tests/test_matrix.js && node tests/test_evidence.js",
+    "test:all": "node tests/test_recipient_config.js && node tests/test_payout_replay.js && node tests/test_merchant_registry.js && node tests/test_gateway_payout_lifecycle.js && node tests/test_matrix.js && node tests/test_evidence.js && node tests/adversarial_suite.js && node tests/test_demo_agent.js && node tests/test_server_api.js"
+  }
+}

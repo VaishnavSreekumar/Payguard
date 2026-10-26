@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PayGuard — Authorization Firewall for Agentic Commerce</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-hover: #f1f5f9;
+      --border: #e2e8f0;
+      --border-dark: #cbd5e1;
+      --text-main: #0f172a;
+      --text-sub: #475569;
+      --text-muted: #64748b;
+      
+      --paypal-blue: #0070ba;
+      --paypal-dark: #003087;
+      --paypal-light-bg: #eff6ff;
+      --paypal-border: #bfdbfe;
+      
+      --allow-text: #047857;
+      --allow-bg: #ecfdf5;
+      --allow-border: #a7f3d0;
+      
+      --require-text: #b45309;
+      --require-bg: #fffbeb;
+      --require-border: #fde68a;
+      
+      --block-text: #be123c;
+      --block-bg: #fff1f2;
+      --block-border: #fecdd3;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    .icon {
+      width: 14px;
+      height: 14px;
+      stroke-width: 2;
+      stroke: currentColor;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vertical-align: middle;
+      display: inline-block;
+    }
+    .icon-lg {
+      width: 16px;
+      height: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    /* TOP HEADER */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      background: var(--text-main);
+      color: #ffffff;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 14px;
+      padding: 6px 10px;
+      border-radius: 4px;
+      border-bottom: 3px solid var(--paypal-blue);
+      letter-spacing: 0.5px;
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.3px;
+    }
+
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .env-badge {
+      background: #f1f5f9;
+      color: var(--text-sub);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .system-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--allow-text);
+      font-weight: 600;
+    }
+
+    .status-indicator {
+      width: 8px;
+      height: 8px;
+      background-color: var(--allow-text);
+      border-radius: 50%;
+    }
+
+    /* MAIN CONTAINER */
+    .app-shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px 28px;
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 24px;
+    }
+
+    /* SIDEBAR NAVIGATION */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav-header {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      padding: 8px 12px 4px 12px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 6px;
+      color: var(--text-sub);
+      font-weight: 500;
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .nav-item:hover {
+      background: var(--surface-hover);
+      color: var(--text-main);
+    }
+
+    .nav-item.active {
+      background: var(--paypal-light-bg);
+      color: var(--paypal-blue);
+      font-weight: 600;
+      border-left: 3px solid var(--paypal-blue);
+    }
+
+    /* CARD CONTAINER */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    /* ARCHITECTURE BAR */
+    .arch-pipeline {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+      align-items: center;
+      gap: 12px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 16px;
+    }
+
+    .arch-step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+    }
+
+    .arch-step-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-sub);
+      margin-bottom: 2px;
+    }
+
+    .arch-step-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .arch-arrow {
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    /* SUMMARY METRICS */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 22px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--text-main);
+    }
+
+    /* BUTTONS */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--font-sans);
+      border-radius: 6px;
+      border: 1px solid var(--border-dark);
+      background: var(--surface);
+      color: var(--text-main);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .btn:hover {
+      background: var(--surface-hover);
+      border-color: var(--text-sub);
+    }
+
+    .btn-primary {
+      background: var(--paypal-blue);
+      color: #ffffff;
+      border-color: var(--paypal-dark);
+    }
+
+    .btn-primary:hover {
+      background: var(--paypal-dark);
+    }
+
+    .btn-danger {
+      background: var(--block-bg);
+      color: var(--block-text);
+      border-color: var(--block-border);
+    }
+
+    .btn-danger:hover {
+      background: #ffe4e6;
+    }
+
+    .btn-warning {
+      background: var(--require-bg);
+      color: var(--require-text);
+      border-color: var(--require-border);
+    }
+
+    .btn-warning:hover {
+      background: #fef3c7;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    /* BADGES */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      letter-spacing: 0.3px;
+    }
+
+    .badge-allow { background: var(--allow-bg); color: var(--allow-text); border: 1px solid var(--allow-border); }
+    .badge-require { background: var(--require-bg); color: var(--require-text); border: 1px solid var(--require-border); }
+    .badge-block { background: var(--block-bg); color: var(--block-text); border: 1px solid var(--block-border); }
+    .badge-paypal { background: var(--paypal-light-bg); color: var(--paypal-blue); border: 1px solid var(--paypal-border); }
+
+    /* TABLE */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    th {
+      text-align: left;
+      padding: 10px 12px;
+      background: #f8fafc;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tr.clickable-row {
+      cursor: pointer;
+    }
+
+    tr.clickable-row:hover td {
+      background: var(--surface-hover);
+    }
+
+    /* REAL AGENT ATTACK BOX */
+    .attack-box {
+      border: 1px solid var(--border-dark);
+      background: #fafafa;
+      border-radius: 8px;
+      padding: 18px;
+      margin-bottom: 20px;
+    }
+
+    .flow-step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      margin-bottom: 6px;
+    }
+
+    /* MODAL INSPECTOR */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 720px;
+      max-width: 92vw;
+      max-height: 92vh;
+      overflow-y: auto;
+      padding: 24px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+
+    .inspector-section {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .inspector-section h5 {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-sub);
+      margin-bottom: 8px;
+    }
+
+    .inspector-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+      font-size: 12px;
+    }
+
+    .inspector-label { color: var(--text-muted); }
+    .inspector-value { font-family: var(--font-mono); font-weight: 600; color: var(--text-main); }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon" style="display: flex; align-items: center; gap: 6px;">
+        <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>PG</span>
+      </div>
+      <div>
+        <div class="brand-title">PAYGUARD <span style="font-size: 11px; font-weight: 500; color: var(--text-muted); margin-left: 6px;">v2.5 Sandbox</span></div>
+        <div class="brand-subtitle">Authorization Firewall for Agentic Commerce &bull; <em>"The agent can request. PayGuard decides. PayPal executes."</em></div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="env-badge">SANDBOX ENVIRONMENT</div>
+      <div class="system-status">
+        <span class="status-indicator"></span> Operational
+      </div>
+    </div>
+  </header>
+
+  <!-- APP SHELL -->
+  <div class="app-shell">
+
+    <!-- SIDEBAR NAVIGATION -->
+    <div class="sidebar">
+      <div class="nav-header">Core Navigation</div>
+      <div class="nav-item active" onclick="switchTab('command-center')">
+        <svg class="icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <span>Command Center</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('agent-attacks')">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></svg>
+        <span>Real Agent Attack</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('approvals')">
+        <svg class="icon" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span>Approvals Queue</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('merchant-registry')">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Trusted Merchants</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('evidence-ledger')">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span>Evidence Log</span>
+      </div>
+    </div>
+
+    <!-- MAIN CONTENT AREA -->
+    <div class="main-content">
+
+      <!-- THREE-SYSTEM ARCHITECTURE BAR -->
+      <div class="card" style="padding: 16px 20px; margin-bottom: 20px;">
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 10px;">
+          SYSTEM BOUNDARY ARCHITECTURE
+        </div>
+        <div class="arch-pipeline">
+          <div class="arch-step">
+            <div class="arch-step-title">1. UNTRUSTED AI AGENT</div>
+            <div class="arch-step-desc">Payment Request</div>
+          </div>
+          <div class="arch-arrow">➔</div>
+          <div class="arch-step" style="border-color: var(--paypal-blue);">
+            <div class="arch-step-title" style="color: var(--paypal-blue);">2. PAYGUARD FIREWALL</div>
+            <div class="arch-step-desc">Deterministic Policy</div>
+          </div>
+          <div class="arch-arrow">➔</div>
+          <div class="arch-step">
+            <div class="arch-step-title">3. SIGNED RECEIPT</div>
+            <div class="arch-step-desc">Hash-Chained Log</div>
+          </div>
+          <div class="arch-arrow">➔</div>
+          <div class="arch-step" style="background: var(--paypal-light-bg); border-color: var(--paypal-border);">
+            <div class="arch-step-title" style="color: var(--paypal-blue);">4. PAYPAL EXECUTION</div>
+            <div class="arch-step-desc">Orders v2 REST API</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- METRICS GRID -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Total Requested</div>
+          <div class="metric-value" id="metric-requested">$0.00</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Allowed</div>
+          <div class="metric-value" style="color: var(--allow-text);" id="metric-allowed">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Awaiting Approval</div>
+          <div class="metric-value" style="color: var(--require-text);" id="metric-awaiting">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Blocked</div>
+          <div class="metric-value" style="color: var(--block-text);" id="metric-blocked">0</div>
+        </div>
+      </div>
+
+      <!-- DEMO CONTROL SCENARIOS BAR -->
+      <div class="card" style="padding: 16px 20px;">
+        <div class="card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
+          <div class="card-title">Scenario Testing & Controls</div>
+          <span style="font-size: 11px; color: var(--text-muted);">Execute real sandbox request scenarios</span>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="runScenario('safe_purchase')">Safe Purchase ($20 AWS)</button>
+          <button class="btn" onclick="runScenario('new_merchant')">New Merchant ($80)</button>
+          <button class="btn" onclick="runScenario('high_value_purchase')">High Value ($500)</button>
+          <button class="btn btn-danger" onclick="runScenario('prompt_injection')">Prompt Injection ($5k)</button>
+          <button class="btn btn-danger" onclick="runScenario('category_spoofing')">Category Spoofing</button>
+          <button class="btn btn-danger" onclick="runScenario('duplicate_request')">Duplicate Replay</button>
+          <button class="btn btn-warning" onclick="simulateTamper()">Simulate Tamper</button>
+          <button class="btn" onclick="restoreTamper()">Restore Evidence Log</button>
+        </div>
+      </div>
+
+      <!-- REAL AGENT ATTACK DEMONSTRATION -->
+      <div class="attack-box" id="agent-attacks-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+              <svg class="icon icon-lg" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></svg>
+              <span>Real Agent Attack Demonstration</span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Simulates an AI agent processing vendor invoices containing prompt injection attacks.</div>
+          </div>
+          <span class="badge badge-require">UNTRAINED CONTENT EXPOSURE</span>
+        </div>
+        <div class="btn-group" style="margin-bottom: 14px;">
+          <button class="btn btn-primary" onclick="runAgentDemo('benign-invoice')">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>Process Benign Invoice ($120 AWS)</span>
+          </button>
+          <button class="btn btn-danger" onclick="runAgentDemo('poisoned-invoice')">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>Process Poisoned Invoice ($80 Gift Cards)</span>
+          </button>
+        </div>
+
+        <!-- VISUAL TRACE CONTAINER -->
+        <div id="agent-flow-container" style="display: none; margin-top: 14px;">
+          <div style="font-size: 12px; font-weight: 700; font-family: var(--font-mono); color: var(--text-sub); margin-bottom: 8px;" id="agent-flow-title">ATTACK EXECUTION TRACE</div>
+          <div class="flow-step" id="flow-step-1">1. INVOICE DOCUMENT READ</div>
+          <div style="text-align: center; color: var(--text-muted); font-size: 11px;">↓</div>
+          <div class="flow-step" id="flow-step-2">2. AGENT REQUEST CREATED</div>
+          <div style="text-align: center; color: var(--text-muted); font-size: 11px;">↓</div>
+          <div class="flow-step" id="flow-step-3">3. REGISTRY TRUST CHECK</div>
+          <div style="text-align: center; color: var(--text-muted); font-size: 11px;">↓</div>
+          <div class="flow-step" id="flow-step-4" style="font-weight: bold;">4. PAYGUARD DECISION</div>
+        </div>
+      </div>
+
+      <!-- LIVE STREAM TABLE -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Payment Requests Ledger</div>
+          <span style="font-size: 11px; color: var(--text-muted);" id="request-count">0 requests</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Agent ID</th>
+              <th>Merchant & Domain</th>
+              <th>Amount</th>
+              <th>PayGuard Decision</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="requests-tbody">
+            <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No payment requests recorded yet. Click a scenario button above.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- EVIDENCE & APPROVALS SPLIT ROW -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        
+        <!-- EVIDENCE STATUS -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Cryptographic Evidence Status</div>
+            <button class="btn" style="padding: 4px 8px; font-size: 11px;" onclick="verifyEvidence()">Verify Chain</button>
+          </div>
+          <div style="padding: 12px; background: #f8fafc; border: 1px solid var(--border); border-radius: 6px;">
+            <div id="evidence-status-display" style="font-size: 13px; font-weight: 700; font-family: var(--font-mono); color: var(--allow-text);">
+              ✓ SIGNATURE VALID & CHAIN INTACT
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;" id="evidence-details-display">
+              Receipt Log: 0 Receipts | Hash-Chained SHA-256 & Ed25519
+            </div>
+          </div>
+        </div>
+
+        <!-- APPROVALS QUEUE -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Human Approval Queue</div>
+            <span class="badge badge-require" id="approval-queue-badge">0 Pending</span>
+          </div>
+          <div id="approval-queue-list">
+            <div style="font-size: 12px; color: var(--text-muted); text-align: center; padding: 12px;">No pending manager approvals</div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- INSPECTOR MODAL -->
+  <div class="modal-overlay" id="inspector-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <div style="font-size: 16px; font-weight: 700;">Authorization Decision Inspector</div>
+          <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);" id="modal-req-id">REQ_000</div>
+        </div>
+        <button class="btn" style="padding: 4px 8px;" onclick="closeModal()">&times;</button>
+      </div>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '';
+    let requestsData = [];
+    let approvalsData = [];
+    let auditData = [];
+    let evidenceVerification = null;
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      const activeNav = Array.from(document.querySelectorAll('.nav-item')).find(el => el.textContent.toLowerCase().includes(tabId.replace('-', ' ')));
+      if (activeNav) activeNav.classList.add('active');
+
+      const attackSec = document.getElementById('agent-attacks-section');
+      if (tabId === 'agent-attacks') {
+        attackSec.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    async function fetchAll() {
+      try {
+        const [reqs, apps, audits, verif] = await Promise.all([
+          fetch(API_BASE + '/api/payment-requests').then(r => r.json()),
+          fetch(API_BASE + '/api/approvals').then(r => r.json()),
+          fetch(API_BASE + '/api/audit').then(r => r.json()),
+          fetch(API_BASE + '/api/evidence/verify').then(r => r.json())
+        ]);
+
+        requestsData = reqs || [];
+        approvalsData = apps || [];
+        auditData = audits || [];
+        evidenceVerification = verif;
+
+        renderSummary();
+        renderRequests();
+        renderApprovals();
+        renderEvidenceStatus();
+      } catch (err) {
+        console.error('Fetch error:', err);
+      }
+    }
+
+    function renderSummary() {
+      let totalAmount = 0;
+      let allowed = 0;
+      let awaiting = 0;
+      let blocked = 0;
+
+      requestsData.forEach(r => {
+        const dec = r.decision?.decision || r.status;
+        const val = Number(r.paymentRequest?.amount?.value || 0);
+        totalAmount += val;
+
+        if (dec === 'ALLOW') allowed++;
+        else if (dec === 'REQUIRE_APPROVAL') awaiting++;
+        else if (dec === 'BLOCK') blocked++;
+      });
+
+      document.getElementById('metric-requested').textContent = `$${totalAmount.toFixed(2)}`;
+      document.getElementById('metric-allowed').textContent = allowed;
+      document.getElementById('metric-awaiting').textContent = awaiting;
+      document.getElementById('metric-blocked').textContent = blocked;
+    }
+
+    function renderRequests() {
+      const tbody = document.getElementById('requests-tbody');
+      document.getElementById('request-count').textContent = `${requestsData.length} requests`;
+
+      if (!requestsData || requestsData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No payment requests recorded yet. Click a scenario button above.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = requestsData.slice().reverse().map(item => {
+        const req = item.paymentRequest || {};
+        const dec = item.decision || {};
+        const status = dec.decision || item.status || 'UNKNOWN';
+
+        let badgeClass = 'badge-block';
+        if (status === 'ALLOW') badgeClass = 'badge-allow';
+        else if (status === 'REQUIRE_APPROVAL') badgeClass = 'badge-require';
+
+        const time = new Date().toLocaleTimeString();
+
+        return `
+          <tr class="clickable-row" onclick="openInspector('${req.requestId}')">
+            <td style="font-family: var(--font-mono); color: var(--text-muted);">${time}</td>
+            <td style="font-family: var(--font-mono);">${req.agentId}</td>
+            <td><strong>${req.merchant?.name || 'Unknown'}</strong> <span style="color: var(--text-muted); font-size: 11px;">(${req.merchant?.domain || ''})</span></td>
+            <td style="font-family: var(--font-mono); font-weight: 600;">$${Number(req.amount?.value || 0).toFixed(2)} ${req.amount?.currency || 'USD'}</td>
+            <td><span class="badge ${badgeClass}">${status}</span></td>
+            <td><button class="btn" style="padding: 3px 8px; font-size: 11px;" onclick="event.stopPropagation(); openInspector('${req.requestId}')">Inspect</button></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderApprovals() {
+      const container = document.getElementById('approval-queue-list');
+      const badge = document.getElementById('approval-queue-badge');
+
+      const pending = approvalsData.filter(a => a.status === 'PENDING');
+      badge.textContent = `${pending.length} Pending`;
+
+      if (pending.length === 0) {
+        container.innerHTML = '<div style="font-size: 12px; color: var(--text-muted); text-align: center; padding: 12px;">No pending manager approvals</div>';
+        return;
+      }
+
+      container.innerHTML = pending.map(appr => `
+        <div style="padding: 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; font-weight: 700; font-family: var(--font-mono); color: var(--require-text);">
+            <span>${appr.merchant}</span>
+            <span>$${appr.amount.toFixed(2)}</span>
+          </div>
+          <div style="font-size: 11px; color: var(--text-sub); margin: 4px 0;">${appr.reason}</div>
+          <div style="display: flex; gap: 6px; margin-top: 6px;">
+            <button class="btn btn-primary" style="padding: 3px 8px; font-size: 11px;" onclick="resolveApproval('${appr.approvalId}', 'approve')">Approve</button>
+            <button class="btn btn-danger" style="padding: 3px 8px; font-size: 11px;" onclick="resolveApproval('${appr.approvalId}', 'reject')">Reject</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderEvidenceStatus() {
+      const disp = document.getElementById('evidence-status-display');
+      const details = document.getElementById('evidence-details-display');
+
+      if (!evidenceVerification) return;
+
+      if (evidenceVerification.valid) {
+        disp.style.color = 'var(--allow-text)';
+        disp.textContent = 'VALID • SIGNATURE & HASH-CHAIN INTACT';
+        details.textContent = `Receipt Log: ${evidenceVerification.count} Receipts | Hash-Chained SHA-256 & Ed25519`;
+      } else {
+        disp.style.color = 'var(--block-text)';
+        disp.textContent = 'TAMPER DETECTED • HASH-CHAIN BROKEN';
+        details.textContent = `Broken at Receipt #${evidenceVerification.brokenAt} | ${evidenceVerification.reason}`;
+      }
+    }
+
+    async function runScenario(scenario) {
+      try {
+        const res = await fetch(API_BASE + `/api/demo/scenario/${scenario}`, { method: 'POST' });
+        const data = await res.json();
+        await fetchAll();
+        const reqId = data.firstRun ? data.secondRun?.decision?.requestId : data.decision?.requestId;
+        if (reqId) openInspector(reqId);
+      } catch (err) {
+        console.error('Scenario error:', err);
+      }
+    }
+
+    async function runAgentDemo(type) {
+      try {
+        const res = await fetch(API_BASE + `/api/demo/agent/${type}`, { method: 'POST' });
+        const data = await res.json();
+        await fetchAll();
+
+        const container = document.getElementById('agent-flow-container');
+        container.style.display = 'block';
+
+        const isPoisoned = type === 'poisoned-invoice';
+        document.getElementById('agent-flow-title').innerHTML = isPoisoned 
+          ? '<span style="color: var(--block-text); font-weight: bold;">[ATTACK DETECTED]</span> REAL AGENT ATTACK TRACE: POISONED INVOICE PROMPT INJECTION' 
+          : '<span style="color: var(--allow-text); font-weight: bold;">[VERIFIED SAFE]</span> BENIGN INVOICE EXECUTION TRACE';
+
+        document.getElementById('flow-step-1').innerHTML = `
+          <strong>1. DOCUMENT INGESTED:</strong> Doc ID <code>${data.invoiceDoc.documentId}</code> (${data.invoiceDoc.vendorName})<br>
+          <span style="color: var(--text-muted); font-size: 11px;">Notes: "${data.invoiceDoc.invoiceNotes}"</span>
+        `;
+
+        document.getElementById('flow-step-2').innerHTML = `
+          <strong>2. AGENT REQUEST GENERATED:</strong> Merchant <code>${data.paymentRequest.merchant.name}</code> | Claimed Category <code>${data.paymentRequest.merchant.category}</code> | Amount <code>$${data.paymentRequest.amount.value.toFixed(2)} ${data.paymentRequest.amount.currency}</code>
+        `;
+
+        const mt = data.merchantTrust || {};
+        document.getElementById('flow-step-3').innerHTML = `
+          <strong>3. PAYGUARD REGISTRY VERIFICATION:</strong><br>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 6px; background: #ffffff; padding: 8px; border: 1px solid var(--border); border-radius: 4px;">
+            <div><span style="color: var(--text-muted); font-size: 10px;">AGENT CLAIM:</span><br><code style="color: var(--text-main); font-weight: bold;">${mt.agentClaimedCategory || data.paymentRequest.merchant.category}</code></div>
+            <div><span style="color: var(--text-muted); font-size: 10px;">PAYGUARD FACT:</span><br><code style="color: var(--paypal-blue); font-weight: bold;">${mt.verifiedCategory || 'gift_cards'}</code></div>
+            <div><span style="color: var(--text-muted); font-size: 10px;">TRUST LEVEL:</span><br><code style="color: ${mt.trustLevel === 'RESTRICTED' ? 'var(--block-text)' : 'var(--allow-text)'}; font-weight: bold;">${mt.trustLevel || 'RESTRICTED'}</code></div>
+            <div><span style="color: var(--text-muted); font-size: 10px;">CATEGORY MATCH:</span><br><span class="badge ${mt.categoryMatch ? 'badge-allow' : 'badge-block'}">${mt.categoryMatch ? 'MATCH' : 'MISMATCH'}</span></div>
+          </div>
+        `;
+
+        const step4 = document.getElementById('flow-step-4');
+        const dec = data.decision.decision;
+        if (dec === 'BLOCK') {
+          step4.style.background = 'var(--block-bg)';
+          step4.style.borderColor = 'var(--block-border)';
+          step4.style.color = 'var(--block-text)';
+          step4.innerHTML = `
+            <strong>4. PAYGUARD DECISION: BLOCKED</strong> <span style="font-family: var(--font-mono); font-size: 11px;">[Reason: ${(data.decision.reasonCodes || []).join(', ')}]</span><br>
+            <div style="margin-top: 6px; padding: 6px 10px; background: #ffffff; border: 1px solid var(--block-border); border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; color: var(--block-text);">PAYPAL EXECUTION BOUNDARY:</span>
+              <span class="badge badge-block">PAYPAL NOT CALLED (0 API Calls)</span>
+            </div>
+          `;
+        } else if (dec === 'ALLOW') {
+          step4.style.background = 'var(--allow-bg)';
+          step4.style.borderColor = 'var(--allow-border)';
+          step4.style.color = 'var(--allow-text)';
+          step4.innerHTML = `
+            <strong>4. PAYGUARD DECISION: ALLOWED</strong> <span style="font-family: var(--font-mono); font-size: 11px;">[Policy & Registry Permitted]</span><br>
+            <div style="margin-top: 6px; padding: 6px 10px; background: #ffffff; border: 1px solid var(--allow-border); border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; color: var(--paypal-blue);">PAYPAL EXECUTION BOUNDARY:</span>
+              <span class="badge badge-paypal">PAYPAL ORDER CREATED (${data.paypalResult?.orderId || 'SUCCESS'})</span>
+            </div>
+          `;
+        } else {
+          step4.style.background = 'var(--require-bg)';
+          step4.style.borderColor = 'var(--require-border)';
+          step4.style.color = 'var(--require-text)';
+          step4.innerHTML = `
+            <strong>4. PAYGUARD DECISION: REQUIRE APPROVAL</strong> <span style="font-family: var(--font-mono); font-size: 11px;">[Human Manager Authorization Required]</span><br>
+            <div style="margin-top: 6px; padding: 6px 10px; background: #ffffff; border: 1px solid var(--require-border); border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; color: var(--require-text);">PAYPAL EXECUTION BOUNDARY:</span>
+              <span class="badge badge-require">PAYPAL NOT CALLED (Awaiting Approval)</span>
+            </div>
+          `;
+        }
+
+        if (data.paymentRequest?.requestId) openInspector(data.paymentRequest.requestId);
+      } catch (err) {
+        console.error('Agent demo error:', err);
+      }
+    }
+
+    async function resolveApproval(approvalId, action) {
+      try {
+        await fetch(API_BASE + `/api/approvals/${approvalId}/${action}`, { method: 'POST' });
+        await fetchAll();
+      } catch (err) {
+        console.error('Approval resolution error:', err);
+      }
+    }
+
+    async function verifyEvidence() {
+      await fetchAll();
+      alert(`Evidence Chain Verification Result:\nValid: ${evidenceVerification.valid}\nReceipt Count: ${evidenceVerification.count}\nReason: ${evidenceVerification.reason}`);
+    }
+
+    async function simulateTamper() {
+      try {
+        const res = await fetch(API_BASE + '/api/demo/tamper', { method: 'POST' });
+        const data = await res.json();
+        await fetchAll();
+        if (data.error) alert(data.error);
+      } catch (err) {
+        console.error('Tamper error:', err);
+      }
+    }
+
+    async function restoreTamper() {
+      try {
+        await fetch(API_BASE + '/api/demo/tamper/restore', { method: 'POST' });
+        await fetchAll();
+      } catch (err) {
+        console.error('Restore error:', err);
+      }
+    }
+
+    async function openInspector(requestId) {
+      const item = requestsData.find(r => r.paymentRequest?.requestId === requestId);
+      if (!item) return;
+
+      const req = item.paymentRequest;
+      const dec = item.decision;
+      const ai = item.result?.aiAnalysis || item.aiAnalysis || {};
+      const mt = item.result?.merchantTrust || item.merchantTrust || {};
+      const status = dec.decision;
+
+      let evidence = null;
+      try {
+        evidence = await fetch(API_BASE + `/api/evidence/${requestId}`).then(r => r.json());
+      } catch (err) {
+        console.error('Evidence fetch error:', err);
+      }
+
+      document.getElementById('modal-req-id').textContent = req.requestId;
+
+      let blockedBoxHTML = '';
+      if (status === 'BLOCK') {
+        blockedBoxHTML = `
+          <div style="background: var(--block-bg); border: 1px solid var(--block-border); border-radius: 6px; padding: 14px; margin-bottom: 14px; text-align: center;">
+            <div style="font-weight: 700; color: var(--block-text); font-size: 14px;">🛑 PAYPAL API REQUEST: NOT SENT</div>
+            <div style="font-size: 12px; color: var(--text-sub); margin-top: 4px;">PayGuard prevented this request from reaching the payment processor.</div>
+            <div style="font-family: var(--font-mono); font-size: 11px; margin-top: 4px; color: var(--block-text);">Reason Codes: [${(dec.reasonCodes || []).join(', ')}]</div>
+          </div>
+        `;
+      }
+
+      let evidenceHTML = '';
+      if (evidence && evidence.receipts && evidence.receipts.length > 0) {
+        const rcpt = evidence.receipts[0];
+        evidenceHTML = `
+          <div class="inspector-section">
+            <h5>5. SIGNED CRYPTOGRAPHIC RECEIPT EVIDENCE</h5>
+            <div class="inspector-grid">
+              <div><span class="inspector-label">Receipt ID:</span> <span class="inspector-value">${rcpt.receiptId}</span></div>
+              <div><span class="inspector-label">Mandate ID:</span> <span class="inspector-value">${rcpt.mandateId}</span></div>
+              <div><span class="inspector-label">Prev Hash:</span> <span class="inspector-value" style="font-size: 10px;">${rcpt.prevHash.substring(0, 16)}...</span></div>
+              <div><span class="inspector-label">Ed25519 Signature:</span> <span class="inspector-value" style="font-size: 10px; color: var(--allow-text);">✓ SIGNED (${rcpt.signature.substring(0, 12)}...)</span></div>
+            </div>
+          </div>
+        `;
+      }
+
+      document.getElementById('modal-content').innerHTML = `
+        ${blockedBoxHTML}
+
+        <!-- PAYMENT REQUEST -->
+        <div class="inspector-section">
+          <h5>1. PAYMENT REQUEST DETAILS</h5>
+          <div class="inspector-grid">
+            <div><span class="inspector-label">Agent ID:</span> <span class="inspector-value">${req.agentId}</span></div>
+            <div><span class="inspector-label">Merchant:</span> <span class="inspector-value">${req.merchant.name} (${req.merchant.domain})</span></div>
+            <div><span class="inspector-label">Agent Claimed Category:</span> <span class="inspector-value">${req.merchant.category}</span></div>
+            <div><span class="inspector-label">Amount:</span> <span class="inspector-value" style="color: var(--paypal-blue);">$${req.amount.value.toFixed(2)} ${req.amount.currency}</span></div>
+            <div style="grid-column: span 2;"><span class="inspector-label">Purpose:</span> <span class="inspector-value" style="font-family: var(--font-sans); font-weight: normal;">"${req.purpose}"</span></div>
+          </div>
+        </div>
+
+        <!-- MERCHANT TRUST REGISTRY -->
+        <div class="inspector-section">
+          <h5>2. MERCHANT TRUST & REGISTRY AUTHORITY</h5>
+          <div class="inspector-grid">
+            <div><span class="inspector-label">Agent Claimed:</span> <span class="inspector-value">${mt.agentClaimedCategory || req.merchant.category}</span></div>
+            <div><span class="inspector-label">Registry Verified:</span> <span class="inspector-value" style="color: var(--paypal-blue);">${mt.verifiedCategory || 'general'}</span></div>
+            <div><span class="inspector-label">Category Match:</span> <span class="badge ${mt.categoryMatch ? 'badge-allow' : 'badge-block'}">${mt.categoryMatch ? '✓ VERIFIED MATCH' : '⚠ CATEGORY MISMATCH'}</span></div>
+            <div><span class="inspector-label">Registry Authority:</span> <span class="inspector-value" style="color: var(--allow-text);">TRUSTED APPLICATION DATA</span></div>
+          </div>
+        </div>
+
+        <!-- AI ANALYSIS -->
+        <div class="inspector-section">
+          <h5>3. AI CONTEXT ANALYSIS (ADVISORY EVIDENCE)</h5>
+          <div class="inspector-grid">
+            <div><span class="inspector-label">Intent Classification:</span> <span class="inspector-value">${ai.intent || req.merchant.category}</span></div>
+            <div><span class="inspector-label">Merchant Risk:</span> <span class="inspector-value">${ai.merchantRisk || 'low'}</span></div>
+            <div><span class="inspector-label">Anomaly Level:</span> <span class="inspector-value">${ai.anomalyLevel || 'none'}</span></div>
+            <div><span class="inspector-label">Prompt Injection:</span> <span class="inspector-value" style="color: ${ai.injectionDetected ? 'var(--block-text)' : 'var(--allow-text)'};">${ai.injectionDetected ? 'YES (DETECTED)' : 'NO (CLEAN)'}</span></div>
+            <div style="grid-column: span 2;"><span class="inspector-label">AI Reasoning:</span> <span class="inspector-value" style="font-family: var(--font-sans); font-weight: normal; color: var(--text-muted);">${ai.reasoningSummary || 'Routine purchase analysis.'}</span></div>
+          </div>
+        </div>
+
+        <!-- POLICY EVALUATION -->
+        <div class="inspector-section">
+          <h5>4. DETERMINISTIC POLICY EVALUATION (SOLE AUTHORITY)</h5>
+          <div class="inspector-grid">
+            <div><span class="inspector-label">Single Limit:</span> <span class="inspector-value">$200.00</span></div>
+            <div><span class="inspector-label">Requested Amount:</span> <span class="inspector-value">$${req.amount.value.toFixed(2)}</span></div>
+            <div><span class="inspector-label">Final Decision:</span> <span class="badge ${status === 'ALLOW' ? 'badge-allow' : status === 'REQUIRE_APPROVAL' ? 'badge-require' : 'badge-block'}">${status}</span></div>
+            <div><span class="inspector-label">Reason Codes:</span> <span class="inspector-value">[${(dec.reasonCodes || []).join(', ')}]</span></div>
+            <div style="grid-column: span 2;"><span class="inspector-label">Explanation:</span> <span class="inspector-value" style="font-family: var(--font-sans); font-weight: normal;">${dec.explanation}</span></div>
+          </div>
+        </div>
+
+        ${evidenceHTML}
+      `;
+
+      document.getElementById('inspector-modal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('inspector-modal').classList.remove('active');
+    }
+
+    setInterval(fetchAll, 3000);
+    fetchAll();
+  </script>
+</body>
+</html>
