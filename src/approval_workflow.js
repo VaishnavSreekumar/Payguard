@@ -10,8 +10,9 @@ export const APPROVAL_STATES = {
 };
 
 export class ApprovalWorkflowManager {
-  constructor({ gateway }) {
+  constructor({ gateway, storage } = {}) {
     this.gateway = gateway;
+    this.storage = storage || gateway?.storage || null;
     this.approvals = new Map();
   }
 
@@ -25,24 +26,40 @@ export class ApprovalWorkflowManager {
       expiresInMinutes
     });
 
-    this.approvals.set(approvalObj.approvalId, {
+    const record = {
       approvalRequest: approvalObj,
       paymentRequest,
       policySnapshot: { ...policy }
-    });
+    };
 
-    this.gateway.auditLogger.logEvent({
-      eventType: AUDIT_EVENT_TYPES.APPROVAL_REQUIRED,
-      requestId: paymentRequest.requestId,
-      agentId: paymentRequest.agentId,
-      decision: 'REQUIRE_APPROVAL',
-      reasonCodes: ['POLICY_APPROVAL_REQUIRED'],
-      explanation: `Human approval requested: ${reason}`,
-      paypalCalled: false,
-      details: { approvalId: approvalObj.approvalId, riskLevel }
-    });
+    this.approvals.set(approvalObj.approvalId, record);
+
+    if (this.storage) {
+      this._lastPersistPromise = this.storage.createApproval(record).catch(err => {
+        console.error('[PayGuard Approvals] Warning: Failed to persist approval to storage:', err.message);
+      });
+    }
+
+    if (this.gateway?.auditLogger) {
+      this.gateway.auditLogger.logEvent({
+        eventType: AUDIT_EVENT_TYPES.APPROVAL_REQUIRED,
+        requestId: paymentRequest.requestId,
+        agentId: paymentRequest.agentId,
+        decision: 'REQUIRE_APPROVAL',
+        reasonCodes: ['POLICY_APPROVAL_REQUIRED'],
+        explanation: `Human approval requested: ${reason}`,
+        paypalCalled: false,
+        details: { approvalId: approvalObj.approvalId, riskLevel }
+      });
+    }
 
     return approvalObj;
+  }
+
+  async flushPendingApprovals() {
+    if (this._lastPersistPromise) {
+      await this._lastPersistPromise;
+    }
   }
 
   getApproval(approvalId) {
@@ -52,19 +69,46 @@ export class ApprovalWorkflowManager {
     if (record.approvalRequest.status === APPROVAL_STATES.PENDING) {
       if (new Date() > new Date(record.approvalRequest.expiresAt)) {
         record.approvalRequest.status = APPROVAL_STATES.EXPIRED;
-        this.gateway.auditLogger.logEvent({
-          eventType: AUDIT_EVENT_TYPES.APPROVAL_EXPIRED,
-          requestId: record.paymentRequest.requestId,
-          agentId: record.paymentRequest.agentId,
-          decision: 'EXPIRED',
-          explanation: `Approval "${approvalId}" expired before human resolution.`,
-          paypalCalled: false,
-          details: { approvalId }
-        });
+        if (this.gateway?.auditLogger) {
+          this.gateway.auditLogger.logEvent({
+            eventType: AUDIT_EVENT_TYPES.APPROVAL_EXPIRED,
+            requestId: record.paymentRequest?.requestId,
+            agentId: record.paymentRequest?.agentId,
+            decision: 'EXPIRED',
+            explanation: `Approval "${approvalId}" expired before human resolution.`,
+            paypalCalled: false,
+            details: { approvalId }
+          });
+        }
       }
     }
 
     return record.approvalRequest;
+  }
+
+  async getApprovalAsync(approvalId) {
+    let record = this.approvals.get(String(approvalId));
+    if (!record && this.storage) {
+      const stored = await this.storage.getApproval(approvalId);
+      if (stored) {
+        record = {
+          approvalRequest: {
+            approvalId: stored.approvalId,
+            requestId: stored.requestId,
+            status: stored.status,
+            riskLevel: stored.riskLevel,
+            amount: stored.amount,
+            merchant: stored.merchant,
+            reason: stored.reason,
+            expiresAt: stored.expiresAt
+          },
+          paymentRequest: stored.paymentRequest,
+          policySnapshot: stored.policySnapshot
+        };
+        this.approvals.set(String(approvalId), record);
+      }
+    }
+    return this.getApproval(approvalId);
   }
 
   getAllApprovals() {
@@ -74,8 +118,27 @@ export class ApprovalWorkflowManager {
     return Array.from(this.approvals.values()).map(r => r.approvalRequest);
   }
 
+  async getAllApprovalsAsync() {
+    if (this.storage) {
+      try {
+        const stored = await this.storage.getAllApprovals();
+        if (Array.isArray(stored) && stored.length > 0) {
+          return stored.map(s => s.approvalRequest || s);
+        }
+      } catch (err) {
+        console.error('[PayGuard Approvals] Warning: Error fetching approvals from storage:', err.message);
+      }
+    }
+    return this.getAllApprovals();
+  }
+
   async approveRequest(approvalId, currentPolicy = null) {
-    const record = this.approvals.get(String(approvalId));
+    let record = this.approvals.get(String(approvalId));
+    if (!record && this.storage) {
+      await this.getApproval(approvalId);
+      record = this.approvals.get(String(approvalId));
+    }
+
     if (!record) {
       throw new Error(`Approval "${approvalId}" not found.`);
     }
@@ -91,6 +154,17 @@ export class ApprovalWorkflowManager {
       throw new Error(`Cannot approve: Approval "${approvalId}" is already ${approvalRequest.status}.`);
     }
 
+    // Atomic resolution in database to prevent double approvals or race conditions
+    if (this.storage) {
+      const atomicResolved = await this.storage.resolveApproval(approvalId, {
+        status: APPROVAL_STATES.APPROVED,
+        resolutionNote: 'Human operator approved'
+      });
+      if (!atomicResolved) {
+        throw new Error(`Cannot approve: Approval "${approvalId}" is already resolved or not found.`);
+      }
+    }
+
     if (this.gateway.ledger.hasSeen(paymentRequest.requestId)) {
       const pastRecord = this.gateway.ledger.getRecord(paymentRequest.requestId);
       if (pastRecord && pastRecord.paypalCalled) {
@@ -100,7 +174,9 @@ export class ApprovalWorkflowManager {
 
     const activePolicy = currentPolicy || policySnapshot;
     const aiAnalysis = await this.gateway.aiProvider.analyze(paymentRequest);
-    const dailySpentSoFar = this.gateway.ledger.getDailySpend(paymentRequest.agentId);
+    const dailySpentSoFar = this.storage
+      ? await this.storage.getDailySpend(paymentRequest.agentId, (paymentRequest.timestamp || new Date().toISOString()).split('T')[0])
+      : this.gateway.ledger.getDailySpend(paymentRequest.agentId);
 
     const reEvalDecision = evaluateAuthorization({
       paymentRequest,
@@ -112,6 +188,15 @@ export class ApprovalWorkflowManager {
 
     if (reEvalDecision.decision === 'BLOCK') {
       approvalRequest.status = APPROVAL_STATES.REJECTED;
+
+      if (this.storage) {
+        await this.storage.resolveApproval(approvalId, {
+          status: APPROVAL_STATES.REJECTED,
+          resolutionNote: `Policy tightened prior to approval resolution: ${reEvalDecision.explanation}`
+        });
+        await this.storage.releaseClaim(paymentRequest.requestId);
+      }
+
       this.gateway.auditLogger.logEvent({
         eventType: AUDIT_EVENT_TYPES.BLOCKED,
         requestId: paymentRequest.requestId,
@@ -123,7 +208,7 @@ export class ApprovalWorkflowManager {
         details: { approvalId }
       });
 
-      this.gateway.receiptLog.append({
+      await this.gateway.receiptLog.append({
         mandateId: this.gateway.spendingMandate.mandateId,
         requestId: paymentRequest.requestId,
         request: paymentRequest,
@@ -178,6 +263,21 @@ export class ApprovalWorkflowManager {
       this.gateway.ledger.addDailySpend(paymentRequest.agentId, paymentRequest.amount.value);
     }
 
+    if (this.storage) {
+      await this.storage.recordRequestResult(paymentRequest.requestId, {
+        agentId: paymentRequest.agentId,
+        amount: paymentRequest.amount.value,
+        currency: paymentRequest.amount.currency || 'USD',
+        spendDate: (paymentRequest.timestamp || new Date().toISOString()).split('T')[0],
+        status: paypalResult.success ? 'SUCCESS' : 'FAILED',
+        decision: 'ALLOW',
+        reasonCodes: ['HUMAN_APPROVED'],
+        paypalCalled: Boolean(paypalResult && paypalResult.success),
+        paypalRef: paypalResult ? (paypalResult.orderId || paypalResult.batchId) : null,
+        batchStatus: paypalResult?.batchStatus || null
+      });
+    }
+
     this.gateway.ledger.record(paymentRequest.requestId, {
       decision: 'ALLOW',
       reasonCodes: ['HUMAN_APPROVED'],
@@ -185,7 +285,7 @@ export class ApprovalWorkflowManager {
     });
 
     // Append post-approval signed receipt
-    this.gateway.receiptLog.append({
+    await this.gateway.receiptLog.append({
       mandateId: this.gateway.spendingMandate.mandateId,
       requestId: paymentRequest.requestId,
       request: paymentRequest,
@@ -210,20 +310,96 @@ export class ApprovalWorkflowManager {
     }
 
     const { approvalRequest, paymentRequest } = record;
+
+    if (this.storage) {
+      this.storage.resolveApproval(approvalId, {
+        status: APPROVAL_STATES.REJECTED,
+        resolutionNote: reason
+      }).then(atomicResolved => {
+        if (!atomicResolved) {
+          console.error(`[PayGuard Approvals] Warning: Reject on ${approvalId} failed atomic resolution`);
+        }
+        if (paymentRequest?.requestId) {
+          return this.storage.releaseClaim(paymentRequest.requestId);
+        }
+      }).catch(err => {
+        console.error('[PayGuard Approvals] Warning: Failed to reject approval in storage:', err.message);
+      });
+    }
+
     approvalRequest.status = APPROVAL_STATES.REJECTED;
 
-    this.gateway.auditLogger.logEvent({
-      eventType: AUDIT_EVENT_TYPES.APPROVAL_REJECTED,
-      requestId: paymentRequest.requestId,
-      agentId: paymentRequest.agentId,
-      decision: 'REJECTED',
-      reasonCodes: ['POLICY_APPROVAL_REQUIRED'],
-      explanation: `Human operator rejected request "${paymentRequest.requestId}". Reason: ${reason}`,
-      paypalCalled: false,
-      details: { approvalId, reason }
-    });
+    if (this.gateway?.auditLogger) {
+      this.gateway.auditLogger.logEvent({
+        eventType: AUDIT_EVENT_TYPES.APPROVAL_REJECTED,
+        requestId: paymentRequest.requestId,
+        agentId: paymentRequest.agentId,
+        decision: 'REJECTED',
+        reasonCodes: ['POLICY_APPROVAL_REQUIRED'],
+        explanation: `Human operator rejected request "${paymentRequest.requestId}". Reason: ${reason}`,
+        paypalCalled: false,
+        details: { approvalId, reason }
+      });
+    }
 
     this.gateway.receiptLog.append({
+      mandateId: this.gateway.spendingMandate.mandateId,
+      requestId: paymentRequest.requestId,
+      request: paymentRequest,
+      decision: 'REJECTED',
+      reasonCodes: ['HUMAN_REJECTED'],
+      paypalCalled: false,
+      note: `Human operator rejected request: ${reason}`
+    });
+
+    return {
+      approvalStatus: APPROVAL_STATES.REJECTED,
+      approvalRequest
+    };
+  }
+
+  async rejectRequestAsync(approvalId, reason = 'Rejected by human operator') {
+    let record = this.approvals.get(String(approvalId));
+    if (!record && this.storage) {
+      await this.getApprovalAsync(approvalId);
+      record = this.approvals.get(String(approvalId));
+    }
+
+    if (!record) {
+      throw new Error(`Approval "${approvalId}" not found.`);
+    }
+
+    const { approvalRequest, paymentRequest } = record;
+
+    if (this.storage) {
+      const atomicResolved = await this.storage.resolveApproval(approvalId, {
+        status: APPROVAL_STATES.REJECTED,
+        resolutionNote: reason
+      });
+      if (!atomicResolved) {
+        throw new Error(`Cannot reject: Approval "${approvalId}" is already resolved or not found.`);
+      }
+      if (paymentRequest?.requestId) {
+        await this.storage.releaseClaim(paymentRequest.requestId);
+      }
+    }
+
+    approvalRequest.status = APPROVAL_STATES.REJECTED;
+
+    if (this.gateway?.auditLogger) {
+      this.gateway.auditLogger.logEvent({
+        eventType: AUDIT_EVENT_TYPES.APPROVAL_REJECTED,
+        requestId: paymentRequest.requestId,
+        agentId: paymentRequest.agentId,
+        decision: 'REJECTED',
+        reasonCodes: ['POLICY_APPROVAL_REQUIRED'],
+        explanation: `Human operator rejected request "${paymentRequest.requestId}". Reason: ${reason}`,
+        paypalCalled: false,
+        details: { approvalId, reason }
+      });
+    }
+
+    await this.gateway.receiptLog.append({
       mandateId: this.gateway.spendingMandate.mandateId,
       requestId: paymentRequest.requestId,
       request: paymentRequest,

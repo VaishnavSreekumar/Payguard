@@ -82,17 +82,32 @@ PAYPAL_CLIENT_ID=your_sandbox_client_id
 PAYPAL_CLIENT_SECRET=your_sandbox_client_secret
 PAYPAL_BASE_URL=https://api-m.sandbox.paypal.com
 PAYPAL_PAYOUT_RECIPIENT_EMAIL=your-sandbox-personal-email@personal.example.com
+DATABASE_URL="postgresql://user:password@ep-your-pooler.region.aws.neon.tech/neondb?sslmode=require"
 ```
+
+### Database Migrations (Neon Postgres)
+PayGuard tracks schema evolution using versioned SQL migrations stored in `migrations/`:
+```bash
+# Run pending migrations against the configured DATABASE_URL
+npm run migrate
+```
+
+Migrations define:
+- `payguard_ledger`: Atomic request idempotency claims and status lifecycles.
+- `payguard_agent_daily_spend`: Dedicated daily budget accounting table with row-level transaction locks (`SELECT ... FOR UPDATE`) compatible with PgBouncer.
+- `payguard_approvals`: Atomic pending human approval records, expiration, and resolution state.
+- `payguard_receipts`: Append-only cryptographic ledger storing sequence numbers, SHA-256 hashes, previous-hash links, and Ed25519 signatures with raw text payload preservation.
 
 ### Running Automated Tests
-PayGuard includes zero-dependency automated test suites:
+PayGuard includes deterministic offline tests and live database integration suites:
 ```bash
-# Run merchant registry & payee security tests
-node tests/test_recipient_config.js
+# Run standard offline regression tests (84/84 tests, memory adapter)
+npm test
 
-# Run mocked payout replay regression tests
-node tests/test_payout_replay.js
+# Run Neon Postgres persistence & concurrency integration tests (isolated schema)
+npm run test:db
 
-# Run full adversarial security suite
-node tests/adversarial_suite.js
+# Run complete test suite (offline, adversarial, API, and DB persistence)
+npm run test:all
 ```
+

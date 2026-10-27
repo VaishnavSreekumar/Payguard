@@ -1,0 +1,42 @@
+# PayGuard - Render Deployment Blueprint
+# Documentation: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: payguard
+    runtime: node
+    plan: free
+    # On Render Free Plan, preDeployCommand is not supported.
+    # Keep buildCommand focused on clean dependency installation:
+    buildCommand: npm install
+    startCommand: npm start
+    # Health check verifies router and read-only policy engine:
+    healthCheckPath: /api/policies
+    envVars:
+      - key: NODE_VERSION
+        value: 22.17.1
+      - key: NODE_ENV
+        value: production
+      - key: PAYGUARD_PG_SCHEMA
+        value: public
+      - key: PAYPAL_BASE_URL
+        value: https://api-m.sandbox.paypal.com
+      # Production Database Secret (entered securely in Render Dashboard)
+      - key: DATABASE_URL
+        sync: false
+      # PayPal Sandbox Credentials (entered securely in Render Dashboard)
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      # PayPal Payout Recipients (entered securely in Render Dashboard)
+      - key: PAYPAL_PAYOUT_RECIPIENT_EMAIL
+        sync: false
+      - key: PAYPAL_PAYOUT_EMAIL_AWS_DEMO
+        sync: false
+      - key: PAYPAL_PAYOUT_EMAIL_GITHUB_DEMO
+        sync: false
+      # Cryptographic Keys (PAYGUARD_ADMIN_PRIVATE_KEY is NEVER set on Render)
+      - key: PAYGUARD_ADMIN_PUBLIC_KEY
+        sync: false
+      - key: PAYGUARD_GATEWAY_PRIVATE_KEY
+        sync: false

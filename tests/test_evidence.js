@@ -7,6 +7,7 @@ import { PaymentProcessor } from '../src/paypal_adapter.js';
 import { createSpendingMandate, verifyMandate, generateKeyPair } from '../src/mandate.js';
 import { ReceiptLog } from '../src/receipts.js';
 import { PayGuardServer } from '../src/server.js';
+import { MemoryStorageAdapter } from '../src/storage/memory_adapter.js';
 
 class MockPayPalProcessor extends PaymentProcessor {
   constructor() {
@@ -105,7 +106,7 @@ async function runEvidenceTests() {
       }
     };
 
-    const verification = verifyMandate(tamperedMandate);
+    const verification = verifyMandate(tamperedMandate, { trustedAdminPublicKey: keyPair.publicKey });
     assertTest(
       'TEST 2: Modified mandate fails verification',
       verification.valid === false && verification.reason.includes('SIGNATURE_INVALID'),
@@ -244,7 +245,25 @@ async function runEvidenceTests() {
   // TEST 8: Evidence endpoint returns correct request receipts
   {
     cleanupTestLog();
-    const server = new PayGuardServer({ port: 3098 });
+    const memStorage = new MemoryStorageAdapter();
+    const processor = new MockPayPalProcessor();
+    const adminKeyPair = generateKeyPair();
+    const testMandate = createSpendingMandate({
+      policy: basePolicy,
+      authorityName: 'Human Owner',
+      expiresInDays: 30,
+      privateKey: adminKeyPair.privateKey
+    });
+    const testGateway = new PayGuardGateway({
+      processor,
+      policy: basePolicy,
+      spendingMandate: testMandate,
+      adminPublicKey: adminKeyPair.publicKey,
+      storage: memStorage
+    });
+    testGateway.receiptLog.logFilePath = testLogPath;
+    testGateway.receiptLog.inMemoryLog = [];
+    const server = new PayGuardServer({ gateway: testGateway, storage: memStorage, port: 3098 });
     await server.start();
 
     try {
@@ -257,13 +276,14 @@ async function runEvidenceTests() {
         purpose: 'API evidence test'
       };
 
-      await fetch('http://localhost:3098/api/payment-requests', {
+      const postRes = await fetch('http://127.0.0.1:3098/api/payment-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      await postRes.json();
 
-      const evRes = await fetch(`http://localhost:3098/api/evidence/${requestId}`);
+      const evRes = await fetch(`http://127.0.0.1:3098/api/evidence/${requestId}`);
       const evData = await evRes.json();
 
       assertTest(

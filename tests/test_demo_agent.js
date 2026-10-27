@@ -193,6 +193,7 @@ async function runDemoAgentTests() {
     const processor = new MockPayPalProcessor();
     const gateway = new PayGuardGateway({ processor, policy: basePolicy });
     gateway.receiptLog.logFilePath = testLogPath;
+    gateway.receiptLog.inMemoryLog = [];
 
     const agent = new PurchasingAgent();
     const agentOut = await agent.processInvoiceDocument(POISONED_INVOICE);

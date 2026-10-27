@@ -7,7 +7,7 @@ async function runRecipientConfigTests() {
   console.log('================================================================\n');
 
   let passedTests = 0;
-  const totalTests = 10;
+  const totalTests = 16;
 
   function assertTest(name, condition, details = '') {
     if (condition) {
@@ -193,6 +193,148 @@ async function runRecipientConfigTests() {
       '10. Payout recipient security verification runs 100% offline without network calls',
       true,
       'Executed purely against local registry and domain logic.'
+    );
+
+    // ----------------------------------------------------------------
+    // TEST 11: PayPal Sandbox simulated addresses (@personal.example.com) accepted in Sandbox mode
+    // ----------------------------------------------------------------
+    const sandboxEmail = 'sb-test-unit-1@personal.example.com';
+    const sandboxRegistry = new PayGuardMerchantRegistry({
+      payoutRecipientEmail: sandboxEmail,
+      isSandbox: true
+    });
+    const resolvedSandbox = sandboxRegistry.getPayoutRecipient({ name: 'Amazon Web Services' });
+
+    assertTest(
+      '11. PayPal-generated Sandbox address (@personal.example.com) accepted when isSandbox=true',
+      resolvedSandbox === sandboxEmail,
+      'Domain: @personal.example.com accepted under explicit Sandbox configuration.'
+    );
+
+    // ----------------------------------------------------------------
+    // TEST 12: PayPal Sandbox simulated addresses (@personal.example.com) strictly rejected in Live mode
+    // ----------------------------------------------------------------
+    const liveRegistry = new PayGuardMerchantRegistry({
+      payoutRecipientEmail: sandboxEmail,
+      isSandbox: false
+    });
+    let liveRejectionError = null;
+    try {
+      liveRegistry.getPayoutRecipient({ name: 'Amazon Web Services' });
+    } catch (err) {
+      liveRejectionError = err.message;
+    }
+
+    assertTest(
+      '12. PayPal Sandbox address (@personal.example.com) rejected when isSandbox=false (Live mode)',
+      liveRejectionError && liveRejectionError.includes('not permitted in live/production mode'),
+      `Correctly failed closed in Live mode: "${liveRejectionError}"`
+    );
+
+    // ----------------------------------------------------------------
+    // TEST 13: Generic RFC 2606 example domain (@example.com) rejected in Sandbox and Live modes
+    // ----------------------------------------------------------------
+    const genericExampleEmail = 'rfc-test-user@example.com';
+    const sandboxGenericRegistry = new PayGuardMerchantRegistry({
+      payoutRecipientEmail: genericExampleEmail,
+      isSandbox: true
+    });
+    let sandboxGenericError = null;
+    try {
+      sandboxGenericRegistry.getPayoutRecipient({ name: 'Amazon Web Services' });
+    } catch (err) {
+      sandboxGenericError = err.message;
+    }
+
+    assertTest(
+      '13. Generic plain example.com domain rejected even in Sandbox mode',
+      sandboxGenericError && sandboxGenericError.includes('Example domain recipient'),
+      `Caught expected rejection: "${sandboxGenericError}"`
+    );
+
+    // ----------------------------------------------------------------
+    // TEST 14: Placeholder string (REPLACE_WITH...) fails closed
+    // ----------------------------------------------------------------
+    const placeholderEmail = 'REPLACE_WITH_SANDBOX_EMAIL@company.com';
+    const placeholderRegistry = new PayGuardMerchantRegistry({
+      payoutRecipientEmail: placeholderEmail,
+      isSandbox: true
+    });
+    let placeholderError = null;
+    try {
+      placeholderRegistry.getPayoutRecipient({ name: 'Amazon Web Services' });
+    } catch (err) {
+      placeholderError = err.message;
+    }
+
+    assertTest(
+      '14. Placeholder string (REPLACE_WITH...) fails closed',
+      placeholderError && placeholderError.includes('Placeholder recipient email rejected'),
+      `Caught expected placeholder error: "${placeholderError}"`
+    );
+
+    // ----------------------------------------------------------------
+    // TEST 15: Dedicated vendors (aws-demo, github-demo) must use dedicated variable (no fallback to default)
+    // ----------------------------------------------------------------
+    const fallbackTestRegistry = new PayGuardMerchantRegistry({
+      payoutRecipientEmail: 'sb-default-buyer@personal.example.com',
+      vendorEmails: {
+        'aws-demo': null,
+        'github-demo': null
+      },
+      isSandbox: true
+    });
+
+    let awsFallbackBlocked = false;
+    let awsFallbackErr = '';
+    try {
+      fallbackTestRegistry.getPayoutRecipient({ name: 'AWS-demo' });
+    } catch (err) {
+      awsFallbackBlocked = true;
+      awsFallbackErr = err.message;
+    }
+
+    let githubFallbackBlocked = false;
+    let githubFallbackErr = '';
+    try {
+      fallbackTestRegistry.getPayoutRecipient({ name: 'GitHub-demo' });
+    } catch (err) {
+      githubFallbackBlocked = true;
+      githubFallbackErr = err.message;
+    }
+
+    assertTest(
+      '15. Dedicated vendors (aws-demo, github-demo) strictly do NOT fall back to default recipient',
+      awsFallbackBlocked && githubFallbackBlocked &&
+      awsFallbackErr.includes('PAYPAL_PAYOUT_EMAIL_AWS_DEMO is missing or blank') &&
+      githubFallbackErr.includes('PAYPAL_PAYOUT_EMAIL_GITHUB_DEMO is missing or blank'),
+      'Both dedicated vendors refused fallback to PAYPAL_PAYOUT_RECIPIENT_EMAIL.'
+    );
+
+    // ----------------------------------------------------------------
+    // TEST 16: Cross-vendor fallback is strictly blocked between dedicated demo vendors
+    // ----------------------------------------------------------------
+    const isolatedRegistry = new PayGuardMerchantRegistry({
+      payoutRecipientEmail: 'sb-default@personal.example.com',
+      vendorEmails: {
+        'aws-demo': 'sb-dedicated-aws@personal.example.com',
+        'github-demo': null // unconfigured
+      },
+      isSandbox: true
+    });
+
+    const resolvedAws = isolatedRegistry.getPayoutRecipient({ name: 'AWS-demo' });
+    let githubCrossVendorBlocked = false;
+    try {
+      isolatedRegistry.getPayoutRecipient({ name: 'GitHub-demo' });
+    } catch {
+      githubCrossVendorBlocked = true;
+    }
+
+    assertTest(
+      '16. Cross-vendor fallback between dedicated demo vendors is strictly blocked',
+      resolvedAws === 'sb-dedicated-aws@personal.example.com' && githubCrossVendorBlocked === true,
+      'AWS-demo resolved to dedicated address; unconfigured GitHub-demo failed closed without adopting AWS-demo address.'
     );
 
   } finally {

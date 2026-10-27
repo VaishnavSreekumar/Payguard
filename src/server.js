@@ -7,10 +7,14 @@ import { createPaymentRequest, createHumanPolicy } from './models.js';
 import { PolicyCompiler } from './compiler.js';
 import { PurchasingAgent, BENIGN_INVOICE, POISONED_INVOICE } from './demo_agent.js';
 
+import { createStorageAdapter } from './storage/factory.js';
+
 export class PayGuardServer {
-  constructor({ gateway, port = 3000 } = {}) {
-    this.gateway = gateway || new PayGuardGateway();
+  constructor({ gateway, storage, port = (process.env.PORT ? parseInt(process.env.PORT, 10) : 3000), host = '0.0.0.0' } = {}) {
+    this.storage = storage || gateway?.storage || null;
+    this.gateway = gateway || new PayGuardGateway({ storage: this.storage });
     this.port = port;
+    this.host = host;
     this.policies = new Map();
     this.requestsStore = new Map();
 
@@ -21,16 +25,32 @@ export class PayGuardServer {
     this.server = http.createServer((req, res) => this.handleRequest(req, res));
   }
 
-  start() {
+  async start() {
+    // If no storage was explicitly injected, create adapter using environment config
+    if (!this.storage && !this.gateway.storage) {
+      this.storage = createStorageAdapter({ schema: process.env.PAYGUARD_PG_SCHEMA || 'public' });
+      this.gateway.storage = this.storage;
+      this.gateway.receiptLog.storage = this.storage;
+      this.gateway.approvalManager.storage = this.storage;
+    }
+
+    if (this.storage) {
+      await this.storage.init({ verifyChainOnBoot: true });
+      await this.gateway.receiptLog.init();
+    }
+
     return new Promise((resolve) => {
-      this.server.listen(this.port, () => {
-        console.log(`PayGuard Command Center & REST API listening on http://localhost:${this.port}`);
+      this.server.listen(this.port, this.host, () => {
+        console.log(`PayGuard Command Center & REST API listening on http://${this.host}:${this.port}`);
         resolve();
       });
     });
   }
 
-  stop() {
+  async stop() {
+    if (this.storage) {
+      await this.storage.close();
+    }
     return new Promise((resolve) => {
       this.server.close(() => {
         resolve();
@@ -56,11 +76,46 @@ export class PayGuardServer {
 
     try {
       // Serve Static Frontend UI for non-API routes
-      if (!pathname.startsWith('/api/')) {
+      if (!pathname.startsWith('/api/') && pathname !== '/health' && pathname !== '/healthz') {
         return this.serveStatic(req, res, pathname);
       }
 
       res.setHeader('Content-Type', 'application/json');
+
+      // 0. GET /health, /healthz, /api/health, or /api/readiness (Safe Deployment Readiness & Health Check)
+      if (method === 'GET' && (pathname === '/health' || pathname === '/healthz' || pathname === '/api/health' || pathname === '/api/readiness')) {
+        let dbConnected = false;
+        const isPostgres = Boolean(this.storage && this.storage.constructor.name === 'PostgresStorageAdapter');
+        try {
+          if (this.storage && typeof this.storage.ping === 'function') {
+            dbConnected = await this.storage.ping();
+          } else if (this.storage) {
+            dbConnected = true;
+          }
+        } catch {
+          dbConnected = false;
+        }
+
+        const isProduction = process.env.NODE_ENV === 'production';
+        // In production, readiness strictly requires Postgres to be connected
+        const isReady = isProduction ? (isPostgres && dbConnected) : (dbConnected || Boolean(this.storage));
+        const statusCode = isReady ? 200 : 503;
+
+        this.sendJson(res, statusCode, {
+          status: isReady ? 'healthy' : 'unhealthy',
+          readiness: isReady ? 'READY' : 'NOT_READY',
+          timestamp: new Date().toISOString(),
+          uptime: process.uptime(),
+          adapter: this.storage ? this.storage.constructor.name : 'none',
+          database: {
+            configured: Boolean(process.env.DATABASE_URL),
+            connected: dbConnected,
+            type: isPostgres ? 'postgresql' : 'memory',
+            schema: process.env.PAYGUARD_PG_SCHEMA || 'public'
+          }
+        });
+        return;
+      }
 
       let body = {};
       if (method === 'POST') {
@@ -120,7 +175,7 @@ export class PayGuardServer {
 
       // 6. GET /api/approvals
       if (method === 'GET' && pathname === '/api/approvals') {
-        const approvals = this.gateway.approvalManager.getAllApprovals();
+        const approvals = await this.gateway.approvalManager.getAllApprovals();
         this.sendJson(res, 200, approvals);
         return;
       }
@@ -136,7 +191,7 @@ export class PayGuardServer {
       // 8. POST /api/approvals/:approvalId/reject
       if (method === 'POST' && /^\/api\/approvals\/[^\/]+\/reject$/.test(pathname)) {
         const approvalId = pathname.split('/')[3];
-        const result = this.gateway.approvalManager.rejectRequest(approvalId, body.reason);
+        const result = await this.gateway.approvalManager.rejectRequest(approvalId, body.reason);
         this.sendJson(res, 200, result);
         return;
       }
@@ -390,6 +445,8 @@ export class PayGuardServer {
 
 // Standalone Server Entry Point
 if (process.argv[1] && process.argv[1].endsWith('server.js')) {
-  const server = new PayGuardServer({ port: 3000 });
+  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const host = process.env.HOST || '0.0.0.0';
+  const server = new PayGuardServer({ port, host });
   server.start();
 }

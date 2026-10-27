@@ -12,3 +12,11 @@ payguard_receipts.jsonl
 # Node modules & Logs
 node_modules/
 *.log
+
+# Temporary test mandates and artifacts
+*signed_mandate*.json
+mandate_unsigned*.json
+
+# Local vendor seed configuration
+seed.json
+*.seed.json

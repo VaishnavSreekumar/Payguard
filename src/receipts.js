@@ -3,12 +3,63 @@ import fs from 'fs';
 import path from 'path';
 import { generateKeyPair } from './mandate.js';
 
+export function computeReceiptHash(receiptData) {
+  const jsonStr = JSON.stringify(receiptData);
+  return crypto.createHash('sha256').update(jsonStr).digest('hex');
+}
+
+export function extractHashableData(receipt) {
+  const { signature, hash, seq_index, prev_hash, ...hashable } = receipt;
+  return hashable;
+}
+
 export class ReceiptLog {
-  constructor({ logFilePath = path.join(process.cwd(), 'payguard_receipts.jsonl'), keyPair } = {}) {
+  constructor({ logFilePath = path.join(process.cwd(), 'payguard_receipts.jsonl'), keyPair, gatewayPrivateKey, storage } = {}) {
     this.logFilePath = logFilePath;
-    this.keyPair = keyPair || generateKeyPair();
+    this.storage = storage;
+    this.initGatewayKey({ keyPair, gatewayPrivateKey });
     this.inMemoryLog = [];
-    this.loadFromDisk();
+    if (!this.storage) {
+      this.loadFromDisk();
+    }
+  }
+
+  initGatewayKey({ keyPair, gatewayPrivateKey }) {
+    if (keyPair && keyPair.privateKey) {
+      let pub = keyPair.publicKey;
+      if (!pub) {
+        const privObj = crypto.createPrivateKey(keyPair.privateKey);
+        pub = crypto.createPublicKey(privObj).export({ type: 'spki', format: 'pem' });
+      }
+      this.keyPair = { privateKey: keyPair.privateKey, publicKey: pub };
+      return;
+    }
+
+    const rawKey = gatewayPrivateKey || process.env.PAYGUARD_GATEWAY_PRIVATE_KEY;
+    if (rawKey) {
+      let privPem = String(rawKey).trim();
+      if (privPem.includes('\\n')) {
+        privPem = privPem.replace(/\\n/g, '\n');
+      }
+      if (!privPem.includes('BEGIN') && fs.existsSync(privPem)) {
+        privPem = fs.readFileSync(privPem, 'utf8').trim();
+      }
+
+      try {
+        const privKeyObj = crypto.createPrivateKey(privPem);
+        const pubKeyObj = crypto.createPublicKey(privKeyObj);
+        this.keyPair = {
+          privateKey: privPem,
+          publicKey: pubKeyObj.export({ type: 'spki', format: 'pem' })
+        };
+        return;
+      } catch (err) {
+        throw new Error(`GATEWAY_RECEIPT_KEY_INVALID: Malformed or invalid gateway private key: ${err.message}`);
+      }
+    }
+
+    // Dev/test fallback: ephemeral gateway keypair (separate from admin key)
+    this.keyPair = generateKeyPair();
   }
 
   loadFromDisk() {
@@ -27,8 +78,25 @@ export class ReceiptLog {
   }
 
   computeHash(receiptData) {
-    const jsonStr = JSON.stringify(receiptData);
-    return crypto.createHash('sha256').update(jsonStr).digest('hex');
+    return computeReceiptHash(receiptData);
+  }
+
+  extractHashableData(receipt) {
+    return extractHashableData(receipt);
+  }
+
+  async init() {
+    if (this.storage) {
+      try {
+        const stored = await this.storage.getReceipts({ limit: 10000 });
+        if (Array.isArray(stored) && stored.length > 0) {
+          this.inMemoryLog = stored;
+        }
+      } catch (err) {
+        console.error('[PayGuard Receipts] Warning: Could not initialize receipts from storage:', err.message);
+      }
+    }
+    return this;
   }
 
   append({
@@ -92,16 +160,38 @@ export class ReceiptLog {
 
     this.inMemoryLog.push(fullReceipt);
 
-    // Persist to disk
-    fs.appendFileSync(this.logFilePath, JSON.stringify(fullReceipt) + '\n', 'utf8');
+    // Persist to durable storage adapter if configured
+    if (this.storage) {
+      this.pendingStorageWrite = this.storage.appendReceipt(fullReceipt).then((saved) => {
+        if (saved && saved.hash) {
+          fullReceipt.hash = saved.hash;
+          fullReceipt.seq_index = saved.seq_index;
+          fullReceipt.prev_hash = saved.prev_hash;
+        }
+        return fullReceipt;
+      }).catch(err => {
+        console.error('[PayGuard Receipts] Warning: Failed to persist receipt to storage:', err.message);
+      });
+    }
+
+    // Persist to local disk file if configured
+    if (this.logFilePath) {
+      try {
+        fs.appendFileSync(this.logFilePath, JSON.stringify(fullReceipt) + '\n', 'utf8');
+      } catch (err) {
+        // Disk write fallback
+      }
+    }
 
     return fullReceipt;
   }
 
-  extractHashableData(receipt) {
-    const { signature, ...hashable } = receipt;
-    return hashable;
+  async flushStorage() {
+    if (this.pendingStorageWrite) {
+      await this.pendingStorageWrite;
+    }
   }
+
 
   verifyChain(receiptsToVerify = null) {
     const list = receiptsToVerify || this.inMemoryLog;
@@ -111,7 +201,7 @@ export class ReceiptLog {
 
     for (let i = 0; i < list.length; i++) {
       const current = list[i];
-      const { signature, publicKey, ...payload } = current;
+      const { signature, publicKey, hash, seq_index, prev_hash, ...payload } = current;
 
       // 1. Signature Verification
       try {
@@ -139,8 +229,9 @@ export class ReceiptLog {
       }
 
       // 2. Hash Chain Verification
+      const currentPrev = current.prevHash || current.prev_hash;
       if (i === 0) {
-        if (current.prevHash !== '0'.repeat(64)) {
+        if (currentPrev !== '0'.repeat(64)) {
           return {
             valid: false,
             count: list.length,
@@ -150,7 +241,7 @@ export class ReceiptLog {
         }
       } else {
         const expectedPrevHash = this.computeHash(this.extractHashableData(list[i - 1]));
-        if (current.prevHash !== expectedPrevHash) {
+        if (currentPrev !== expectedPrevHash) {
           return {
             valid: false,
             count: list.length,

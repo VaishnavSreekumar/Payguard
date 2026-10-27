@@ -1,0 +1,28 @@
+{
+  "vendors": {
+    "aws-demo": {
+      "merchantId": "aws-demo",
+      "displayName": "AWS Demo Vendor",
+      "aliases": [
+        "aws-demo",
+        "aws-demo.example.internal"
+      ],
+      "category": "cloud_infrastructure",
+      "trustLevel": "TRUSTED",
+      "known": true,
+      "payoutEmail": "REPLACE_WITH_SANDBOX_PERSONAL_ACCOUNT_EMAIL_FOR_AWS_DEMO"
+    },
+    "github-demo": {
+      "merchantId": "github-demo",
+      "displayName": "GitHub Demo Vendor",
+      "aliases": [
+        "github-demo",
+        "github-demo.example.internal"
+      ],
+      "category": "developer_tools",
+      "trustLevel": "TRUSTED",
+      "known": true,
+      "payoutEmail": "REPLACE_WITH_SANDBOX_PERSONAL_ACCOUNT_EMAIL_FOR_GITHUB_DEMO"
+    }
+  }
+}
